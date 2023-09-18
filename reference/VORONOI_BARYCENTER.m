@@ -39,6 +39,9 @@ classdef VORONOI_BARYCENTER < handle
       R = obj.param.R;       % communication range
       void = obj.param.void; % VOID width
       env = varargin{4};
+      %% 道なり距離に基づくボロノイ
+      volonoi_map = voronoiRoadDistance(state.p(1:2)',sensor.neighbor,env)
+
       %% LiDAR 部分のボロノイ領域算出
       LiDAR_V = poly_volonoi(state,sensor.neighbor,sensor.region,void,R);
       [LiDAR_cent, LiDAR_mass] = map_centre_of_gravity(sensor.xq , sensor.yq , sensor.grid_density,LiDAR_V);
@@ -385,4 +388,107 @@ function route = a_star(start,goal,env)
     % % cand_real_cost
     % hold off
     % drawnow
+end
+
+
+function volonoimap = voronoiRoadDistance(pos,pos_other,env)
+    %
+    xp = env.xp
+    yp = env.yp
+    d  = env.d
+    grid_in = env.grid_in
+
+    grid_size = [env.grid_row env.grid_col];
+    
+    %
+    attempt = 0;
+
+    volonoimap = ones(grid_size) * -1;
+
+    agent_grid = [find(xp  >= pos(1,1),1) find(yp >= pos(1,2),1) ];
+    node_size         = 1;
+    node_grid         = agent_grid ;
+    node_parent_index = 0;
+    node_cost         = 0;
+    node_status       = 1;
+    node_agent_id     = 1;
+    volonoimap(agent_grid(1),agent_grid(2)) = 1;
+    
+    for i = 1: size(pos_other,1)
+        agent_grid = [find(xp  >= pos_other(i,1),1) find(yp >= pos_other(i,2),1) ];
+        node_size              = node_size + 1;
+        node_grid(i+1,:)         = agent_grid;
+        node_parent_index(i+1)   = 0;
+        node_cost(i+1)           = 0;
+        node_status(i+1)         = 1;
+        node_agent_id(i+1)       = i+1;
+        volonoimap(agent_grid(1),agent_grid(2)) = i+1;
+    end
+    % 移動候補の決定
+    move = [1 0; 1 1; 0 1; -1 1; -1 0; -1 -1; 0 -1; 1 -1];
+    move_cost = [1 sqrt(2) 1 sqrt(2) 1 sqrt(2) 1 sqrt(2) ]*d;
+    move_len = length(move_cost);
+
+    f_loop = true;
+    while f_loop
+        % 探索するインデックスの決定
+        index =  find(node_status==1);
+        % if isempty(index); break; end % 候補がない場合は終了
+        if isempty(find(node_agent_id(index)==1,1));break; end
+        index = index(node_cost(index) == min(node_cost(index))); % そのうちコストが最小のindexを抽出
+        index = index(1);
+        
+            
+        node_status(index)    = 0;
+        parent_grid  = node_grid(index,:);
+        parent_cost = node_cost(index);
+        parent_agent_id = node_agent_id(index);
+
+        % 親ノードからの探索候補を順に検証
+        for i = 1:move_len
+            attempt = attempt + 1;
+            cand_pn = true;
+            cand_grid = parent_grid + move(i,:);
+            if ~ all(and([0 0]<cand_grid,cand_grid<=grid_size),2) % Gridが存在するかの判別
+            elseif ~ grid_in(cand_grid(1),cand_grid(2))  % ENVのPolyshape内か判別
+            else % 上記条件を満たす場合に実行
+                cand_cost = parent_cost + move_cost(i);
+                duplication_index = find(all(node_grid==cand_grid,2)); % 重複しているノードを探索
+
+                if ~isempty(duplication_index)% 探索済と候補が重複している場合
+                    if any(node_cost(duplication_index) <= cand_cost)
+                        cand_pn=false; % 探索済みの実コストが小さい場合は候補を棄却
+                    else 
+                        node_status(duplication_index) = -1; % 候補の実コストが小さい場合は探索済みのステータスを無効に
+                    end
+                end
+
+                if cand_pn
+                node_size                    = node_size + 1;
+                node_grid(node_size,:)       = cand_grid ;
+                node_parent_index(node_size) = index;
+                node_cost(node_size)         = cand_cost;
+                node_status(node_size)       = 1;
+                node_agent_id(node_size)     = parent_agent_id;
+                volonoimap(cand_grid(1),cand_grid(2)) = parent_agent_id;
+                % 
+                    % if all(goal_grid == cand_grid)
+                    %     f_loop=false; 
+                    %     break;
+                    % end % 候補とゴールのグリッドが一致する場合に探索を終了
+                end
+            end
+        end
+
+    end
+        figure(2)
+        hold on
+
+        image(xp,yp,volonoimap','CDataMapping','scaled')
+        scatter(pos(1),pos(2))
+        scatter(pos_other(:,1),pos_other(:,2))
+        colorbar
+        daspect([1 1 1])
+        hold off
+        drawnow
 end
