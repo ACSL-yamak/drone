@@ -40,7 +40,7 @@ classdef VORONOI_BARYCENTER < handle
       void = obj.param.void; % VOID width
       env = varargin{4};
       %% 道なり距離に基づくボロノイ
-      volonoi_map = voronoiRoadDistance(state.p(1:2)',sensor.neighbor,env)
+      volonoi_map = voronoiRoadDistance(state.p(1:2)',sensor.neighbor,env);
 
       %% LiDAR 部分のボロノイ領域算出
       LiDAR_V = poly_volonoi(state,sensor.neighbor,sensor.region,void,R);
@@ -212,26 +212,6 @@ function [centroid , mass] = map_centre_of_gravity(xq , yq , grid_density, regio
     centroid = [cogx; cogy; 0];     
 end
 
-function dijkstra_volonoi(state,neighbor,env)
-    % 道のり距離でポリシェイプを作成する関数
-    %% Init
-    xp = env.xp ; yp = env.yp;d = env.d ;
-    grid_size = [env.grid_row env.grid_col];
-    move = [1 0; 1 1; 0 1; -1 1; -1 0; -1 -1; 0 -1; 1 -1];
-    move_cost = [1 sqrt(2) 1 sqrt(2) 1 sqrt(2) 1 sqrt(2) ]*d;
-    
-    grid_poly = false(grid_size)
-    grid_cost = ones(grid_size)*length(grid_poly)*d;
-    
-    
-    agent_n = size(neighbor,1)
-    % ▼ Variable that stores the status of each node during traversal
-    node_size = 1;
-    node_grid = -1
-    
-end
-
-
 function route = a_star(start,goal,env)
     %% Setting
     d = env.d;
@@ -393,10 +373,12 @@ end
 
 function volonoimap = voronoiRoadDistance(pos,pos_other,env)
     %
-    xp = env.xp
-    yp = env.yp
-    d  = env.d
-    grid_in = env.grid_in
+    pos_other = (pos_other)';
+    pos_other = pos_other(:,1:2);
+    xp = env.xp;
+    yp = env.yp;
+    d  = env.d;
+    grid_in = env.grid_in;
 
     grid_size = [env.grid_row env.grid_col];
     
@@ -482,8 +464,8 @@ function volonoimap = voronoiRoadDistance(pos,pos_other,env)
 
     end
         figure(2)
+        clf
         hold on
-
         image(xp,yp,volonoimap','CDataMapping','scaled')
         scatter(pos(1),pos(2))
         scatter(pos_other(:,1),pos_other(:,2))
